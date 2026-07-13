@@ -1,0 +1,34 @@
+repo_name: llvm/torch-mlir
+local_path: torch-mlir
+
+llvm:
+  dep_type: submodule
+  dep_path: externals/llvm-project
+
+build:
+  dir: build
+  clean:
+    - rm -rf build
+  commands:
+    - sed -i '/TorchMLIRPythonModules/d' test/CMakeLists.txt
+    - >-
+      sed -i
+      's/set(STABLEHLO_ENABLE_BINDINGS_PYTHON ON)/set(STABLEHLO_ENABLE_BINDINGS_PYTHON OFF)/'
+      CMakeLists.txt
+    - >-
+      cmake -G Ninja -B build -S externals/llvm-project/llvm
+      -DCMAKE_BUILD_TYPE=Release
+      -DLLVM_ENABLE_PROJECTS=mlir
+      -DLLVM_EXTERNAL_PROJECTS='torch-mlir'
+      -DLLVM_EXTERNAL_TORCH_MLIR_SOURCE_DIR=${repo_path}
+      -DLLVM_ENABLE_ASSERTIONS=ON
+      -DLLVM_TARGETS_TO_BUILD=host
+      -DMLIR_ENABLE_BINDINGS_PYTHON=OFF
+      -DTORCH_MLIR_ENABLE_PYTORCH_EXTENSIONS=OFF
+    - cmake --build build
+  timeout: 3600
+
+test:
+  commands:
+    - build/bin/llvm-lit -sv build/tools/torch-mlir/test --filter-out 'python/'
+  timeout: 1800

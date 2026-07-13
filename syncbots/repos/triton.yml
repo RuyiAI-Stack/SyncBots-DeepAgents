@@ -1,0 +1,25 @@
+repo_name: triton-lang/triton
+local_path: triton
+
+llvm:
+  dep_type: hash_file
+  dep_path: cmake/llvm-hash.txt
+
+build:
+  dir: build
+  clean:
+    - rm -rf build
+    - rm -rf llvm-project/build llvm-project/install
+    - rm -rf python/triton.egg-info
+  commands:
+    - make dev-install-llvm
+  timeout: 3600
+
+test:
+  commands:
+    - make test-lit test-cpp
+  timeout: 1800
+
+env:
+  TRITON_BUILD_WITH_CCACHE: "true"
+  PYTHONUNBUFFERED: "1"

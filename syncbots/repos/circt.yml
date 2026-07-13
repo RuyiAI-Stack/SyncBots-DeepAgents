@@ -1,0 +1,28 @@
+repo_name: llvm/circt
+local_path: circt
+
+llvm:
+  dep_type: submodule
+  dep_path: llvm
+
+build:
+  dir: build
+  clean:
+    - rm -rf build
+  commands:
+    - >-
+      cmake -G Ninja llvm/llvm -B build
+      -DCMAKE_BUILD_TYPE=RelWithDebInfo
+      -DLLVM_ENABLE_ASSERTIONS=ON
+      -DLLVM_TARGETS_TO_BUILD=host
+      -DLLVM_ENABLE_PROJECTS=mlir
+      -DLLVM_EXTERNAL_PROJECTS=circt
+      -DLLVM_EXTERNAL_CIRCT_SOURCE_DIR=${repo_path}
+      -DLLVM_ENABLE_LLD=ON
+    - ninja -C build
+  timeout: 3600
+
+test:
+  commands:
+    - build/bin/llvm-lit -sv build/test
+  timeout: 1800

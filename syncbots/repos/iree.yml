@@ -1,0 +1,29 @@
+repo_name: iree-org/iree
+local_path: iree
+
+llvm:
+  dep_type: submodule
+  dep_path: third_party/llvm-project
+
+build:
+  dir: build
+  clean:
+    - rm -rf build
+  commands:
+    - >-
+      cmake -G Ninja -B build -S .
+      -DCMAKE_BUILD_TYPE=RelWithDebInfo
+      -DIREE_ENABLE_ASSERTIONS=ON
+      -DIREE_ENABLE_SPLIT_DWARF=ON
+      -DIREE_ENABLE_THIN_ARCHIVES=ON
+      -DCMAKE_C_COMPILER=clang
+      -DCMAKE_CXX_COMPILER=clang++
+      -DIREE_ENABLE_LLD=ON
+    - cmake --build build
+    - cmake --build build --target iree-test-deps
+  timeout: 3600
+
+test:
+  commands:
+    - ./build_tools/cmake/ctest_all.sh build
+  timeout: 1800

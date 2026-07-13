@@ -1,0 +1,35 @@
+repo_name: openxla/stablehlo
+local_path: stablehlo
+
+llvm:
+  dep_type: hash_file
+  dep_path: build_tools/llvm_version.txt
+
+build:
+  dir: build
+  clean:
+    - rm -rf build
+    - rm -rf llvm-build
+  commands:
+    - >-
+      hash="$(cat ./build_tools/llvm_version.txt)" &&
+      cd llvm-project &&
+      git fetch origin "$hash" && git checkout "$hash"
+    - >-
+      MLIR_ENABLE_BINDINGS_PYTHON=OFF
+      build_tools/build_mlir.sh ${repo_path}/llvm-project/
+      ${repo_path}/llvm-build
+    - >-
+      cmake -GNinja -B build
+      -DLLVM_ENABLE_LLD=ON
+      -DCMAKE_BUILD_TYPE=Release
+      -DLLVM_ENABLE_ASSERTIONS=ON
+      -DSTABLEHLO_ENABLE_BINDINGS_PYTHON=OFF
+      -DMLIR_DIR=${repo_path}/llvm-build/lib/cmake/mlir
+    - cmake --build build
+  timeout: 3600
+
+test:
+  commands:
+    - ${repo_path}/llvm-build/bin/llvm-lit -sv ${repo_path}/build/stablehlo/tests
+  timeout: 1800
