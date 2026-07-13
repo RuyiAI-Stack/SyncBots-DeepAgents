@@ -102,7 +102,7 @@ jobs:
             --segment-span ${{ inputs.segment_span }} \
             --llm-config llm_config.yaml \
             --output-dir ./syncbots-output \
-            ${{ inputs.auto_pr && '--auto-branch' || '' }}
+            ${{ inputs.auto_pr && '--auto-branch --branch-base main' || '' }}
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_PAT || github.token }}
 
