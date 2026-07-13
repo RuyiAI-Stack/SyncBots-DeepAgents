@@ -90,3 +90,21 @@ syncbots bench --bench-config bench.yaml
 ```bash
 python -m pytest syncbots/tests/ -q
 ```
+
+## GitHub Actions 集成
+
+本项目提供 [reusable workflow](.github/workflows/llvm-upgrade.yml)，其他仓库可以直接调用。
+
+### 在 buddy-mlir 中使用
+
+1. 在 `buddy-compiler/buddy-mlir` 仓库的 Settings > Secrets 中添加：
+   - `LLM_API_KEY` — LLM API 密钥
+   - `LLM_BASE_URL` — (可选) 自定义端点
+   - `LLM_PROVIDER` — (可选) `anthropic` / `openai` / `openai_compatible`
+   - `PAT_TOKEN` — 有 repo 写权限的 GitHub PAT（用于创建 PR）
+
+2. 将 [`examples/caller-workflow-buddy-mlir.yml`](examples/caller-workflow-buddy-mlir.yml) 复制到 buddy-mlir 的 `.github/workflows/` 目录
+
+3. 在 GitHub Actions 页面手动触发，或启用 `schedule` 定时运行
+
+触发后，agent 会自动 checkout 仓库、升级 LLVM、提交 PR。

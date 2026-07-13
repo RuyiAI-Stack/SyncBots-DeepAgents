@@ -1,0 +1,51 @@
+# 将此文件放到 buddy-mlir 仓库的 .github/workflows/ 目录下
+# 即 buddy-compiler/buddy-mlir/.github/workflows/llvm-upgrade.yml
+#
+# 需要在仓库 Settings > Secrets and variables > Actions 中配置：
+#   - LLM_API_KEY: LLM API 密钥
+#   - LLM_BASE_URL: (可选) 自定义 API 端点
+#   - LLM_PROVIDER: (可选) anthropic / openai / openai_compatible
+#   - PAT_TOKEN: 有 repo 写权限的 GitHub Personal Access Token（用于提 PR）
+
+name: LLVM Upgrade (SyncBots)
+
+on:
+  # 手动触发
+  workflow_dispatch:
+    inputs:
+      target_llvm:
+        description: "Target LLVM commit hash (blank = main HEAD)"
+        required: false
+        default: ""
+      max_iterations:
+        description: "Max fix iterations"
+        required: false
+        default: "10"
+      strong_model:
+        description: "Strong model (main agent)"
+        required: false
+        default: "claude-sonnet-4-6"
+      weak_model:
+        description: "Weak model (subagents, blank = same as strong)"
+        required: false
+        default: ""
+
+  # 定时触发（可选，每周一早上运行）
+  # schedule:
+  #   - cron: '0 2 * * 1'
+
+jobs:
+  upgrade:
+    uses: RuyiAI-Stack/SyncBots-DeepAgents/.github/workflows/llvm-upgrade.yml@main
+    with:
+      repo_name: buddy-mlir
+      target_llvm: ${{ github.event.inputs.target_llvm || '' }}
+      max_iterations: ${{ fromJSON(github.event.inputs.max_iterations || '10') }}
+      strong_model: ${{ github.event.inputs.strong_model || 'claude-sonnet-4-6' }}
+      weak_model: ${{ github.event.inputs.weak_model || '' }}
+      auto_pr: true
+    secrets:
+      LLM_API_KEY: ${{ secrets.LLM_API_KEY }}
+      LLM_BASE_URL: ${{ secrets.LLM_BASE_URL }}
+      LLM_PROVIDER: ${{ secrets.LLM_PROVIDER }}
+      GITHUB_PAT: ${{ secrets.PAT_TOKEN }}

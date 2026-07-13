@@ -1,0 +1,132 @@
+name: LLVM Upgrade Agent
+
+on:
+  workflow_call:
+    inputs:
+      repo_name:
+        description: "Repository name (e.g. buddy-mlir)"
+        required: true
+        type: string
+      repo_ref:
+        description: "Branch/tag to upgrade from"
+        required: false
+        type: string
+        default: "main"
+      target_llvm:
+        description: "Target LLVM commit hash (blank = latest main HEAD)"
+        required: false
+        type: string
+        default: ""
+      max_iterations:
+        description: "Max fix iterations (0 = unlimited)"
+        required: false
+        type: number
+        default: 10
+      strong_model:
+        description: "Strong model for main agent"
+        required: false
+        type: string
+        default: "claude-sonnet-4-6"
+      weak_model:
+        description: "Weak model for subagents"
+        required: false
+        type: string
+        default: ""
+      segment_span:
+        description: "Max LLVM commits per upgrade segment"
+        required: false
+        type: number
+        default: 1000
+      auto_pr:
+        description: "Automatically create a PR on success"
+        required: false
+        type: boolean
+        default: true
+    secrets:
+      LLM_API_KEY:
+        description: "API key for the LLM provider"
+        required: true
+      LLM_BASE_URL:
+        description: "Custom API base URL (optional)"
+        required: false
+      LLM_PROVIDER:
+        description: "Provider: anthropic / openai / openai_compatible"
+        required: false
+      GITHUB_PAT:
+        description: "GitHub PAT with repo write access (for PR creation)"
+        required: false
+
+jobs:
+  upgrade:
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    steps:
+      - name: Checkout target repository
+        uses: actions/checkout@v4
+        with:
+          repository: buddy-compiler/${{ inputs.repo_name }}
+          ref: ${{ inputs.repo_ref }}
+          submodules: recursive
+          fetch-depth: 0
+          token: ${{ secrets.GITHUB_PAT || github.token }}
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install SyncBotsDeep
+        run: |
+          pip install git+https://github.com/RuyiAI-Stack/SyncBots-DeepAgents.git
+
+      - name: Generate LLM config
+        run: |
+          cat > llm_config.yaml << EOF
+          default:
+            provider: ${{ secrets.LLM_PROVIDER || 'anthropic' }}
+            model: ${{ inputs.strong_model }}
+            api_key: ${{ secrets.LLM_API_KEY }}
+            base_url: ${{ secrets.LLM_BASE_URL || '' }}
+          strong_model: ${{ inputs.strong_model }}
+          weak_model: ${{ inputs.weak_model || '' }}
+          github_token: ${{ secrets.GITHUB_PAT || github.token }}
+          EOF
+
+      - name: Run LLVM upgrade agent
+        run: |
+          syncbots upgrade-single \
+            --repo ${{ inputs.repo_name }} \
+            --repo-path . \
+            --target-llvm "${{ inputs.target_llvm }}" \
+            --max-iterations ${{ inputs.max_iterations }} \
+            --segment-span ${{ inputs.segment_span }} \
+            --llm-config llm_config.yaml \
+            --output-dir ./syncbots-output \
+            ${{ inputs.auto_pr && '--auto-branch' || '' }}
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_PAT || github.token }}
+
+      - name: Upload agent logs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: syncbots-logs-${{ inputs.repo_name }}
+          path: syncbots-output/
+          retention-days: 30
+
+      - name: Create Pull Request
+        if: success() && inputs.auto_pr
+        uses: peter-evans/create-pull-request@v6
+        with:
+          token: ${{ secrets.GITHUB_PAT || github.token }}
+          branch: syncbots/llvm-upgrade-${{ github.run_id }}
+          title: "[LLVM] Automated upgrade by SyncBots"
+          body: |
+            Automated LLVM upgrade performed by [SyncBots-DeepAgents](https://github.com/RuyiAI-Stack/SyncBots-DeepAgents).
+
+            - Target LLVM: `${{ inputs.target_llvm || 'main HEAD' }}`
+            - Model: `${{ inputs.strong_model }}`
+            - Max iterations: ${{ inputs.max_iterations }}
+
+            Please review the changes carefully before merging.
+          commit-message: "[LLVM] Automated upgrade to ${{ inputs.target_llvm || 'latest' }}"
