@@ -59,7 +59,7 @@ on:
 jobs:
   upgrade:
     runs-on: ubuntu-latest
-    timeout-minutes: 120
+    timeout-minutes: 300
     steps:
       - name: Checkout target repository
         uses: actions/checkout@v4
