@@ -58,7 +58,7 @@ on:
 
 jobs:
   upgrade:
-    runs-on: a800
+    runs-on: A800
     timeout-minutes: 300
     steps:
       - name: Checkout target repository
