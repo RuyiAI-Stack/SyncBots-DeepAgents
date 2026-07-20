@@ -35,6 +35,7 @@ logger = logging.getLogger(__name__)
 
 DEFAULT_MAX_ITERATIONS = 0  # <= 0 means unlimited
 MAX_IDENTICAL_FAILURES = 3  # stop if the same failure recurs this many times
+MAX_NO_EDIT_ITERATIONS = 1  # stop if agent produces no code changes this many consecutive times
 DEFAULT_SEGMENT_MAX_SPAN = 1000  # split upgrades spanning more LLVM commits; <=0 disables
 
 # error_type -> the split fix skill the agent should consult (progressive
@@ -266,6 +267,7 @@ def run_upgrade(
             seg_index=seg_idx, seg_total=n_seg, final_target=final_target,
         )
         seen_fingerprints: dict[str, int] = {}
+        consecutive_no_edit = 0
         seg_iteration = 0
         seg_passed = False
 
@@ -276,6 +278,31 @@ def run_upgrade(
                 agent, task, iteration=step, show_live=show_agent, log_dir=log_dir,
             )
             agent_reports.append(report)
+
+            # ── No-edit detection: abort if agent made no code changes ──
+            current_diff = git_working_diff(repo.local_path)
+            if not current_diff.strip():
+                consecutive_no_edit += 1
+                logger.warning(
+                    "[loop] %s iteration %d: agent produced no code changes (%d/%d)",
+                    repo.repo_name, step, consecutive_no_edit, MAX_NO_EDIT_ITERATIONS,
+                )
+                if consecutive_no_edit >= MAX_NO_EDIT_ITERATIONS:
+                    repo.status = "env_blocker"
+                    logger.warning(
+                        "[loop] %s aborting: no code changes for %d consecutive iteration(s). "
+                        "This is likely an environmental blocker, not a code issue.",
+                        repo.repo_name, consecutive_no_edit,
+                    )
+                    _write_run_summary(log_dir, agent_reports, repo, "env_blocker",
+                                       segments_completed, n_seg)
+                    return _finish(_result(
+                        "env_blocker",
+                        f"Agent produced no code changes for {consecutive_no_edit} consecutive "
+                        "iteration(s). The failure is likely an environmental blocker.",
+                    ))
+            else:
+                consecutive_no_edit = 0
 
             result = verify(
                 repo, clean_first=(step == 0),
