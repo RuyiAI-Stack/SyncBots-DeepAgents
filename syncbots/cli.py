@@ -93,14 +93,21 @@ def _apply_inline_api(cfg, args):
 
 
 def _agent_run_kwargs(args: argparse.Namespace) -> dict:
+    from .loop.controller import DEFAULT_SEGMENT_MAX_SPAN
+
     kwargs = {
         "show_agent": getattr(args, "show_agent", False),
         "agent_log_dir": getattr(args, "agent_log_dir", None) or None,
         "output_dir": getattr(args, "output_dir", None) or None,
     }
+    # Staged segmenting is OFF by default. Two ways to turn it on:
+    #   --segment-span N   -> use span N (N=0 forces off, overriding --enable-segments)
+    #   --enable-segments  -> use the default span (DEFAULT_SEGMENT_MAX_SPAN)
     segment_span = getattr(args, "segment_span", None)
     if segment_span is not None:
         kwargs["segment_max_span"] = int(segment_span)
+    elif getattr(args, "enable_segments", False):
+        kwargs["segment_max_span"] = DEFAULT_SEGMENT_MAX_SPAN
     return kwargs
 
 
@@ -442,7 +449,7 @@ def cmd_init(args: argparse.Namespace) -> int:
         no_memory=False, provider=provider or None,
         base_url=base_url or None, api_key=api_key or None,
         show_agent=False, agent_log_dir=None, output_dir=None,
-        segment_span=None,
+        segment_span=None, enable_segments=False,
     )
     return cmd_upgrade_single(ns)
 
@@ -619,9 +626,16 @@ def build_parser() -> argparse.ArgumentParser:
                  "or $SYNCBOTS_OUTPUT_DIR). Layout: <output>/<repo>/<timestamp>/",
         )
         p.add_argument(
+            "--enable-segments", action="store_true",
+            help="Enable staged upgrades: split large LLVM spans into segments "
+                 "(default OFF; segment span comes from --segment-span or "
+                 "the built-in default of 1000 commits)",
+        )
+        p.add_argument(
             "--segment-span", type=int, default=None,
-            help="Max LLVM commits per upgrade segment; larger spans are staged "
-                 "into multiple small upgrades (default 1000; 0 disables staging)",
+            help="Max LLVM commits per upgrade segment. Passing this implies "
+                 "--enable-segments; pass 0 to force staging OFF "
+                 "(default: unset = staging disabled unless --enable-segments)",
         )
         # Inline API overrides: customize the API without editing llm_config.yaml.
         g = p.add_argument_group("API overrides (optional; override llm_config.yaml)")

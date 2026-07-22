@@ -36,7 +36,7 @@ logger = logging.getLogger(__name__)
 DEFAULT_MAX_ITERATIONS = 0  # <= 0 means unlimited
 MAX_IDENTICAL_FAILURES = 3  # stop if the same failure recurs this many times
 MAX_NO_EDIT_ITERATIONS = 1  # stop if agent produces no code changes this many consecutive times
-DEFAULT_SEGMENT_MAX_SPAN = 1000  # split upgrades spanning more LLVM commits; <=0 disables
+DEFAULT_SEGMENT_MAX_SPAN = 1000  # span (in LLVM commits) used per segment when staging is enabled
 
 # error_type -> the split fix skill the agent should consult (progressive
 # disclosure: it only reads the one SKILL.md matching the current failure).
@@ -131,6 +131,10 @@ def _build_fix_task(repo: RepoInfo, result: VerifyResult, iteration: int, histor
         "```",
         result.error_summary[:4000],
         "```",
+        "",
+        "**IMPORTANT**: If multiple files/dialects show the SAME error pattern, "
+        "fix ALL of them in this iteration. Use `grep` to find all similar "
+        "occurrences. Read the full build log if needed to see all affected files.",
     ]
     if result.log_path:
         parts += [
@@ -166,14 +170,17 @@ def run_upgrade(
     show_agent: bool = False,
     agent_log_dir: Optional[str] = None,
     output_dir: Optional[str] = None,
-    segment_max_span: int = DEFAULT_SEGMENT_MAX_SPAN,
+    segment_max_span: int = 0,
 ) -> UpgradeResult:
     """Drive the full loop-engineered upgrade for one repository.
 
-    Large upgrades (first-parent span > *segment_max_span* LLVM commits) are
-    automatically staged: the range is split into intermediate segment targets
-    and each segment runs its own prescan + fix loop, so diffs stay small and
-    failures stay attributable. *max_iterations* applies per segment.
+    Staged upgrades are OFF by default (*segment_max_span* == 0): the loop
+    drives one prescan + fix cycle against the final target regardless of
+    span size. Pass a positive *segment_max_span* (typically
+    :data:`DEFAULT_SEGMENT_MAX_SPAN`) to split first-parent spans exceeding
+    that many LLVM commits into staged segment targets — each segment runs
+    its own prescan + fix loop so diffs stay small and failures stay
+    attributable. *max_iterations* applies per segment.
     """
     if do_scan:
         scan_repo(repo, target_hash=target_llvm_hash)

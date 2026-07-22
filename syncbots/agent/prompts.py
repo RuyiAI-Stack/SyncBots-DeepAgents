@@ -47,6 +47,9 @@ the OUTER loop builds and tests. Use `execute` only for opt-style tools \
 (mlir-opt, stablehlo-opt, circt-opt). For searching, prefer the `glob`/`grep` \
 tools over shell grep/find.
 - Focus on the FIRST error -- later errors are often cascading.
+- When you fix an error, proactively search for the SAME pattern in other \
+files/dialects and fix ALL occurrences in one pass. Use `grep` to find similar \
+code before stopping.
 - Use `edit_file` for targeted edits; `write_file` only for new files.
 - Start from the grep-verified locations you are given. If prescan reported 0 \
 hits for an API, it is not used here -- do not search for it again.

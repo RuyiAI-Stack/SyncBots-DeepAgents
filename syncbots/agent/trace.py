@@ -283,9 +283,8 @@ def invoke_and_trace(
 
     if log_dir:
         report_path = os.path.join(log_dir, f"iteration-{iteration}.md")
-        write_text(report_path, transcript)
         write_text(os.path.join(log_dir, f"iteration-{iteration}-summary.md"), f"# Summary (iteration {iteration})\n\n{summary}\n")
-        logger.info("[agent] saved transcript: %s", report_path)
+        logger.info("[agent] saved summary: %s", report_path)
 
     if not show_live and messages:
         logger.info("[agent] iteration %d summary:\n%s", iteration, _truncate(summary, 2000))
